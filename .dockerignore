@@ -1,0 +1,22 @@
+# === Build artifacts ===
+**/target
+dist
+node_modules
+
+# === IDE / Editors ===
+**/.idea
+.vscode
+
+# === Git / VCS ===
+**/.git
+**/.gitignore
+.git
+.gitignore
+
+# === Docker files ===
+Dockerfile
+docker-compose.yml
+
+# === Logs / temp ===
+*.log
+*.tmp

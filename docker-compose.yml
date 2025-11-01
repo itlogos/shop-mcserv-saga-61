@@ -1,0 +1,242 @@
+services:
+  zookeeper:
+    image: zookeeper:latest
+    container_name: zookeeper
+    ports: [ "2181:2181" ]
+    environment:
+      ZOO_TICK_TIME: "2000"
+      ZOO_CLIENT_PORT: "2181"
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok"   # <— разрешаем 4lw-команду ruok
+      ZOO_STANDALONE_ENABLED: "true"       # <— одиночный режим (без кворума)
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/2181' >/dev/null 2>&1 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+  kafka:
+    image: wurstmeister/kafka:2.13-2.8.1
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports: [ "9092:9092" ]
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: shop-redis
+    ports: [ "6379:6379" ]
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:16
+    container_name: shop-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak -d keycloak" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.4
+    container_name: shop-keycloak
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_URL: "http://localhost:8085"
+      KC_HOSTNAME_ADMIN_URL: "http://localhost:8085"
+      VITE_KEYCLOAK_REALM: "shop"        # ← ЭТОГО НЕ ХВАТАЛО
+      VITE_KEYCLOAK_CLIENT: "frontend"
+    ports: [ "8085:8080" ]
+    volumes:
+      - ./keycloak/realm-export:/opt/keycloak/data/import
+    restart: unless-stopped
+
+  store-db:
+    image: postgres:16
+    container_name: shop-store-db
+    ports: [ "5433:5432" ]
+    environment:
+      POSTGRES_DB: storedb
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: store
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U store -d storedb" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  customer-db:
+    image: postgres:16
+    container_name: shop-customer-db
+    ports: [ "5434:5432" ]
+    environment:
+      POSTGRES_DB: customerdb
+      POSTGRES_USER: customer
+      POSTGRES_PASSWORD: customer
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U customer -d customerdb" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  order-db:
+    image: postgres:16
+    container_name: shop-order-db
+    ports: [ "5435:5432" ]
+    environment:
+      POSTGRES_DB: orderdb
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD: orders
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U orders -d orderdb" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  store-service:
+    build:
+      context: .
+      dockerfile: ./store-service/Dockerfile
+    container_name: shop-store-service
+    depends_on:
+      store-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      SERVER_PORT: "8081"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://store-db:5432/storedb"
+      SPRING_DATASOURCE_USERNAME: "store"
+      SPRING_DATASOURCE_PASSWORD: "store"
+      SPRING_REDIS_HOST: "redis"
+      SPRING_REDIS_PORT: "6379"
+      SECURITY_DISABLED: "false"
+      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+    restart: unless-stopped
+
+  customer-service:
+    build:
+      context: .
+      dockerfile: ./customer-service/Dockerfile
+    container_name: shop-customer-service
+    depends_on:
+      customer-db: { condition: service_healthy }
+    environment:
+      SERVER_PORT: "8082"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://customer-db:5432/customerdb"
+      SPRING_DATASOURCE_USERNAME: "customer"
+      SPRING_DATASOURCE_PASSWORD: "customer"
+      SECURITY_DISABLED: "false"
+      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: ./order-service/Dockerfile
+    container_name: shop-order-service
+    depends_on:
+      order-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    environment:
+      SERVER_PORT: "8083"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://order-db:5432/orderdb"
+      SPRING_DATASOURCE_USERNAME: "orders"
+      SPRING_DATASOURCE_PASSWORD: "orders"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      STORE_SERVICE_URL: "http://store-service:8081"
+      SECURITY_DISABLED: "false"
+      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+    restart: unless-stopped
+
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
+    container_name: shop-api-gateway
+    depends_on:
+      redis:            { condition: service_healthy }
+      store-service:    { condition: service_started }
+      customer-service: { condition: service_started }
+      order-service:    { condition: service_started }
+    ports: ["8080:8080"]
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_REDIS_HOST: "redis"
+      SPRING_REDIS_PORT: "6379"
+      SPRING_PROFILES_ACTIVE: "secure"
+      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+    restart: unless-stopped
+
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: ./Dockerfile
+    container_name: shop-web-app
+    environment:
+      VITE_API_BASE: "http://localhost:8080"
+      VITE_KEYCLOAK_URL: "http://localhost:8085"
+      VITE_KEYCLOAK_REALM: "shop"
+      VITE_KEYCLOAK_CLIENT: "frontend"
+    ports: ["5173:5173"]
+    depends_on:
+      api-gateway: { condition: service_started }
+    restart: unless-stopped
+
+volumes:
+  keycloak_db:
+  store_db:
+  customer_db:
+  order_db:
+

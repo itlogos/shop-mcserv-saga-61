@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+  cloud:
+    gateway:
+      default-filters:
+        - TokenRelay
+      routes:
+        - id: store
+          uri: http://store-service:8081
+          predicates:
+            - Path=/store/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+        - id: customer
+          uri: http://customer-service:8082
+          predicates:
+            - Path=/customer/**
+          filters:
+            - StripPrefix=1
+        - id: order
+          uri: http://order-service:8083
+          predicates:
+            - Path=/order/**
+          filters:
+            - StripPrefix=1
+
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: ${OAUTH_ISSUER_URI:http://localhost:8085/realms/shop}
+        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://localhost:8085/realms/shop/protocol/openid-connect/certs}

@@ -166,7 +166,10 @@ services:
       dockerfile: ./customer-service/Dockerfile
     container_name: shop-customer-service
     depends_on:
-      customer-db: { condition: service_healthy }
+      store-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }       # ← добавить
+      keycloak: { condition: service_started }    # ← добавить (у Keycloak есть healthcheck? если нет — хотя бы started)
     environment:
       SERVER_PORT: "8082"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://customer-db:5432/customerdb"
@@ -205,11 +208,11 @@ services:
       dockerfile: ./api-gateway/Dockerfile
     container_name: shop-api-gateway
     depends_on:
-      redis:            { condition: service_healthy }
-      store-service:    { condition: service_started }
+      redis: { condition: service_healthy }
+      store-service: { condition: service_started }
       customer-service: { condition: service_started }
-      order-service:    { condition: service_started }
-    ports: ["8080:8080"]
+      order-service: { condition: service_started }
+    ports: [ "8080:8080" ]
     environment:
       SERVER_PORT: "8080"
       SPRING_REDIS_HOST: "redis"
@@ -229,7 +232,7 @@ services:
       VITE_KEYCLOAK_URL: "http://localhost:8085"
       VITE_KEYCLOAK_REALM: "shop"
       VITE_KEYCLOAK_CLIENT: "frontend"
-    ports: ["5173:5173"]
+    ports: [ "5173:5173" ]
     depends_on:
       api-gateway: { condition: service_started }
     restart: unless-stopped

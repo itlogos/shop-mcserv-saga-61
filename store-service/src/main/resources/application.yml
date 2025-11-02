@@ -13,12 +13,23 @@ spring:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}
       port: ${SPRING_REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    listener:
+      missing-topics-fatal: false
+    consumer:
+      properties:
+        # чтобы не падать при временной недоступности брокера на старте
+        retry.backoff.ms: 1000
+        reconnect.backoff.ms: 1000
+
 security:
   oauth2:
     resourceserver:
       jwt:
-        issuer-uri: ${OAUTH_ISSUER_URI:http://localhost:8085/realms/shop}
-        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://localhost:8085/realms/shop/protocol/openid-connect/certs}
+        issuer-uri: ${OAUTH_ISSUER_URI:http://keycloak:8080/realms/shop}
+        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
 app:
   securityDisabled: ${SECURITY_DISABLED:false}
 
@@ -26,6 +37,3 @@ flyway:
   enabled: true
   locations: classpath:db/migration
 
-spring:
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}

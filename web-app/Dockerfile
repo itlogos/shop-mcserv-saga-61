@@ -25,3 +25,20 @@ COPY . .
 ENV CHOKIDAR_USEPOLLING=true
 EXPOSE 5173
 CMD ["npm","run","dev","--","--host","0.0.0.0","--port","5173","--logLevel","warn"]
+
+
+## syntax=docker/dockerfile:1.7
+#FROM node:20-bookworm-slim
+#
+#WORKDIR /app
+#COPY package*.json ./
+#
+## детерминированная установка
+#RUN --mount=type=cache,target=/root/.npm \
+#    npm ci --include=optional --no-audit --no-fund
+#
+#COPY . .
+#
+#EXPOSE 5173
+#CMD ["npm","run","dev","--","--host","0.0.0.0","--port","5173","--logLevel","warn"]
+

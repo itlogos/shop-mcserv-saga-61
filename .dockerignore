@@ -1,22 +1,36 @@
-# === Build artifacts ===
-**/target
-dist
-node_modules
+## === Build artifacts ===
+#**/target
+#dist
+#node_modules
+#
+## === IDE / Editors ===
+#**/.idea
+#.vscode
+#
+## === Git / VCS ===
+#**/.git
+#**/.gitignore
+#.git
+#.gitignore
+#
+## === Docker files ===
+#Dockerfile
+#docker-compose.yml
+#
+## === Logs / temp ===
+#*.log
+#*.tmp
 
-# === IDE / Editors ===
-**/.idea
+**/node_modules
+**/.bin
+**/dist
+**/build
+**/.cache
 .vscode
-
-# === Git / VCS ===
-**/.git
-**/.gitignore
 .git
 .gitignore
-
-# === Docker files ===
-Dockerfile
-docker-compose.yml
-
-# === Logs / temp ===
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 *.log
-*.tmp

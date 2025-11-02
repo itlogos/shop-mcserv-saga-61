@@ -141,12 +141,14 @@ services:
 
   store-service:
     build:
-      context: .
-      dockerfile: ./store-service/Dockerfile
+      context: ./store-service
+      dockerfile: Dockerfile
     container_name: shop-store-service
     depends_on:
       store-db: { condition: service_healthy }
       redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      keycloak: { condition: service_started }
     environment:
       SERVER_PORT: "8081"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://store-db:5432/storedb"
@@ -162,8 +164,8 @@ services:
 
   customer-service:
     build:
-      context: .
-      dockerfile: ./customer-service/Dockerfile
+      context: ./customer-service
+      dockerfile: Dockerfile
     container_name: shop-customer-service
     depends_on:
       store-db: { condition: service_healthy }
@@ -183,12 +185,13 @@ services:
 
   order-service:
     build:
-      context: .
-      dockerfile: ./order-service/Dockerfile
+      context: ./order-service
+      dockerfile: Dockerfile
     container_name: shop-order-service
     depends_on:
       order-db: { condition: service_healthy }
       kafka: { condition: service_healthy }
+      keycloak: { condition: service_started }
     environment:
       SERVER_PORT: "8083"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://order-db:5432/orderdb"
@@ -204,8 +207,8 @@ services:
 
   api-gateway:
     build:
-      context: .
-      dockerfile: ./api-gateway/Dockerfile
+      context: ./api-gateway
+      dockerfile: Dockerfile
     container_name: shop-api-gateway
     depends_on:
       redis: { condition: service_healthy }

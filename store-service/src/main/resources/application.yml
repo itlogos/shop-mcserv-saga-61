@@ -15,12 +15,14 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
 
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     listener:
       missing-topics-fatal: false
     consumer:
       properties:
         # чтобы не падать при временной недоступности брокера на старте
+        group-id: ${spring.application.name}-group
+        auto-offset-reset: earliest
         retry.backoff.ms: 1000
         reconnect.backoff.ms: 1000
 
@@ -32,7 +34,9 @@ spring:
           #        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
           jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
 app:
-  securityDisabled: ${SECURITY_DISABLED:false}
+#  securityDisabled: ${SECURITY_DISABLED:false}
+  orderTopic: order.created
+  orderConfirmedTopic: order.confirmed
 
 flyway:
   enabled: true

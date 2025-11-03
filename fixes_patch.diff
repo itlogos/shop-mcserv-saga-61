@@ -1,0 +1,210 @@
+*** a/api-gateway/src/main/resources/application.yml
+--- b/api-gateway/src/main/resources/application.yml
+@@
+ server:
+   port: ${SERVER_PORT:8080}
+ 
+ spring:
+   data:
+     redis:
+       host: ${SPRING_REDIS_HOST:localhost}
+       port: ${SPRING_REDIS_PORT:6379}
+   cloud:
+     gateway:
+       default-filters:
+         - TokenRelay
+       routes:
+         - id: store
+           uri: http://store-service:8081
+           predicates:
+             - Path=/store/**
+           filters:
+             - StripPrefix=1
+         - id: customer
+           uri: http://customer-service:8082
+           predicates:
+             - Path=/customer/**
+           filters:
+             - StripPrefix=1
+         - id: order
+           uri: http://order-service:8083
+           predicates:
+             - Path=/order/**
+           filters:
+             - StripPrefix=1
++  security:
++    oauth2:
++      resourceserver:
++        jwt:
++          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+ 
+-security:
+-  oauth2:
+-    resourceserver:
+-      jwt:
+-        issuer-uri: ${OAUTH_ISSUER_URI:http://localhost:8085/realms/shop}
+-        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://localhost:8085/realms/shop/protocol/openid-connect/certs}
+*** a/order-service/src/main/resources/application.yml
+--- b/order-service/src/main/resources/application.yml
+@@
+ server:
+   port: ${SERVER_PORT:8083}
+ spring:
+   datasource:
+     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/orderdb}
+     username: ${SPRING_DATASOURCE_USERNAME:orders}
+     password: ${SPRING_DATASOURCE_PASSWORD:orders}
+   jpa:
+     hibernate:
+       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+     open-in-view: false
+   kafka:
+     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
++  security:
++    oauth2:
++      resourceserver:
++        jwt:
++          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+-security:
+-  oauth2:
+-    resourceserver:
+-      jwt:
+-#        issuer-uri: ${OAUTH_ISSUER_URI:http://keycloak:8080/realms/shop}
+-        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+ app:
+   seedOrder: ${SEED_ORDER:false}
+   securityDisabled: ${SECURITY_DISABLED:false}
+   storeUrl: ${STORE_SERVICE_URL:http://localhost:8081}
+ 
+ flyway:
+   enabled: true
+   locations: classpath:db/migration
+*** a/customer-service/src/main/resources/application.yml
+--- b/customer-service/src/main/resources/application.yml
+@@
+ server:
+   port: ${SERVER_PORT:8082}
+ spring:
+   datasource:
+     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/customerdb}
+     username: ${SPRING_DATASOURCE_USERNAME:customer}
+     password: ${SPRING_DATASOURCE_PASSWORD:customer}
+   jpa:
+     hibernate:
+       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+     open-in-view: false
++  security:
++    oauth2:
++      resourceserver:
++        jwt:
++          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+-security:
+-  oauth2:
+-    resourceserver:
+-      jwt:
+-#        issuer-uri: ${OAUTH_ISSUER_URI:http://keycloak:8080/realms/shop}
+-        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+ app:
+   securityDisabled: ${SECURITY_DISABLED:false}
+ 
+ flyway:
+   enabled: true
+   locations: classpath:db/migration
+*** a/store-service/src/main/resources/application.yml
+--- b/store-service/src/main/resources/application.yml
+@@
+ server:
+   port: ${SERVER_PORT:8081}
+ spring:
+   datasource:
+     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/storedb}
+     username: ${SPRING_DATASOURCE_USERNAME:store}
+     password: ${SPRING_DATASOURCE_PASSWORD:store}
+   jpa:
+     hibernate:
+       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+     open-in-view: false
++  security:
++    oauth2:
++      resourceserver:
++        jwt:
++          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+-security:
+-  oauth2:
+-    resourceserver:
+-      jwt:
+-#        issuer-uri: ${OAUTH_ISSUER_URI:http://keycloak:8080/realms/shop}
+-        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+ app:
+   securityDisabled: ${SECURITY_DISABLED:false}
+ 
+ flyway:
+   enabled: true
+   locations: classpath:db/migration
+*** a/order-service/src/main/java/com/example/order/model/OrderItem.java
+--- b/order-service/src/main/java/com/example/order/model/OrderItem.java
+@@
+ package com.example.order.model;
+ 
+ import jakarta.persistence.Embeddable;
+ import lombok.AllArgsConstructor;
+ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+ import jakarta.persistence.*;
+ 
+ 
+ @Embeddable
+ @Data
+ @NoArgsConstructor
+ @AllArgsConstructor
+ @Builder
+ public class OrderItem {
+-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+-    private Long id;
+-
+     private Long productId;
+     private Integer quantity;
+     private Double price;
+-
+-    @ManyToOne(fetch = FetchType.LAZY)
+-    @JoinColumn(name = "order_id")
+-    private Order order;
+ }
+*** a/order-service/src/main/java/com/example/order/model/Order.java
+--- b/order-service/src/main/java/com/example/order/model/Order.java
+@@
+ @Entity @Data @NoArgsConstructor @AllArgsConstructor @Builder
+ @Table(name="orders")
+ public class Order {
+   @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+   private Long id;
+   private Long customerId;
+   @ElementCollection
+-  @CollectionTable(name="order_items", joinColumns=@JoinColumn(name="order_id"))
++  @CollectionTable(name="order_items", joinColumns=@JoinColumn(name="order_id"))
++  @AttributeOverrides({
++    @AttributeOverride(name = "productId", column = @Column(name = "product_id")),
++    @AttributeOverride(name = "quantity",  column = @Column(name = "quantity")),
++    @AttributeOverride(name = "price",     column = @Column(name = "price"))
++  })
+   private List<OrderItem> items = new ArrayList<>();
+   private String status; // CREATED, FAILED
+ }
+*** a/docker-compose.yml
+--- b/docker-compose.yml
+@@
+   api-gateway:
+     image: shop-mcserv-saga-61-api-gateway
+     container_name: shop-api-gateway
+     depends_on:
+       - redis
+     ports: [ "8080:8080" ]
+     environment:
+       SERVER_PORT: "8080"
+       SPRING_REDIS_HOST: "redis"
+       SPRING_REDIS_PORT: "6379"
+       SPRING_PROFILES_ACTIVE: "secure"
++      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+     restart: unless-stopped

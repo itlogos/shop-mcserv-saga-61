@@ -15,8 +15,6 @@ import jakarta.persistence.*;
 @AllArgsConstructor
 @Builder
 public class OrderItem {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
 
     private Long productId;
     private Integer quantity;

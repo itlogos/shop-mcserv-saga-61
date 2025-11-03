@@ -48,17 +48,12 @@ FROM node:20-bookworm-slim
 WORKDIR /app
 COPY package*.json ./
 
-# deterministic install; optional deps включены
+# детерминированная установка по linux-совместимому lock
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --include=optional --no-audit --no-fund
 
-# копируем только нужное
-COPY index.html ./
-COPY public ./public
-COPY src ./src
-# если есть конфиги — раскомментируй нужные строки:
-# COPY vite.config.* ./
-# COPY tsconfig*.json ./
+# копируем весь проект; .dockerignore отсеет мусор
+COPY . .
 
 EXPOSE 5173
 CMD ["npm","run","dev","--","--host","0.0.0.0","--port","5173","--logLevel","warn"]

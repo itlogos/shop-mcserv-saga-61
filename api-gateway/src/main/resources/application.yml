@@ -40,4 +40,10 @@ spring:
         jwt:
           #        issuer-uri: ${OAUTH_ISSUER_URI:http://localhost:8085/realms/shop}
           #        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://localhost:8085/realms/shop/protocol/openid-connect/certs}
-          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
+#          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://localhost:8085/realms/shop/protocol/openid-connect/certs}
+          issuer-uri: http://localhost:8085/realms/shop
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,gateway"

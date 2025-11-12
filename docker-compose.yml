@@ -84,8 +84,8 @@ services:
       # v2-настройки hostname:
       KC_HOSTNAME_URL: "http://localhost:8085"   # ← это станет iss
       KC_HOSTNAME_ADMIN_URL: "http://localhost:8085"
-#      KC_PROXY: "edge"
-#      KC_HOSTNAME: keycloak
+    #      KC_PROXY: "edge"
+    #      KC_HOSTNAME: keycloak
     #      KC_HOSTNAME_STRICT: "false"
     #      KC_HOSTNAME_STRICT_HTTPS: "false"
     ports:

@@ -21,7 +21,7 @@ spring:
 app:
   seedOrder: ${SEED_ORDER:false}
   securityDisabled: ${SECURITY_DISABLED:false}
-  storeUrl: ${STORE_SERVICE_URL:http://localhost:8081}
+  storeUrl: ${STORE_SERVICE_URL:http://store-service:8081}
 
 flyway:
   enabled: true

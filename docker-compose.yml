@@ -81,12 +81,13 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
 
-       # v2-настройки hostname:
+      # v2-настройки hostname:
       KC_HOSTNAME_URL: "http://localhost:8085"   # ← это станет iss
       KC_HOSTNAME_ADMIN_URL: "http://localhost:8085"
+#      KC_PROXY: "edge"
 #      KC_HOSTNAME: keycloak
-#      KC_HOSTNAME_STRICT: "false"
-#      KC_HOSTNAME_STRICT_HTTPS: "false"
+    #      KC_HOSTNAME_STRICT: "false"
+    #      KC_HOSTNAME_STRICT_HTTPS: "false"
     ports:
       - "8085:8080"
     depends_on:
@@ -94,6 +95,27 @@ services:
         condition: service_healthy
     volumes:
       - ./keycloak/realm-export:/opt/keycloak/data/import
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
+    container_name: shop-api-gateway
+    depends_on:
+      redis: { condition: service_healthy }
+      store-service: { condition: service_started }
+      customer-service: { condition: service_started }
+      order-service: { condition: service_started }
+    ports: [ "8080:8080" ]
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_REDIS_HOST: "redis"
+      SPRING_REDIS_PORT: "6379"
+      SPRING_PROFILES_ACTIVE: "secure"
+      #      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      #      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
     restart: unless-stopped
 
   store-db:
@@ -164,8 +186,8 @@ services:
       SPRING_REDIS_HOST: "redis"
       SPRING_REDIS_PORT: "6379"
       SECURITY_DISABLED: "false"
-#      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
-#      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      #      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      #      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
     restart: unless-stopped
@@ -186,8 +208,8 @@ services:
       SPRING_DATASOURCE_USERNAME: "customer"
       SPRING_DATASOURCE_PASSWORD: "customer"
       SECURITY_DISABLED: "false"
-#      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
-#      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      #      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      #      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
     restart: unless-stopped
@@ -209,32 +231,12 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       STORE_SERVICE_URL: "http://store-service:8081"
       SECURITY_DISABLED: "false"
-#      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
-#      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
+      #      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
+      #      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
     restart: unless-stopped
 
 
-  api-gateway:
-    build:
-      context: .
-      dockerfile: ./api-gateway/Dockerfile
-    container_name: shop-api-gateway
-    depends_on:
-      redis: { condition: service_healthy }
-      store-service: { condition: service_started }
-      customer-service: { condition: service_started }
-      order-service: { condition: service_started }
-    ports: [ "8080:8080" ]
-    environment:
-      SERVER_PORT: "8080"
-      SPRING_REDIS_HOST: "redis"
-      SPRING_REDIS_PORT: "6379"
-      SPRING_PROFILES_ACTIVE: "secure"
-#      OAUTH_ISSUER_URI: "http://keycloak:8080/realms/shop"
-#      OAUTH_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/shop/protocol/openid-connect/certs"
-    restart: unless-stopped
 
   web-app:
     build:

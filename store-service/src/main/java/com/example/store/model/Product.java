@@ -8,5 +8,5 @@ public class Product {
   private Long id;
   @Column(nullable=false) private String name;
   @Column(nullable=false) private Double price;
-  @Column(nullable=false) private Integer quantity;
+  @Column(nullable=false) private Integer quantity = 0; // default;
 }

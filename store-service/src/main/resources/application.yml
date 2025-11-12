@@ -33,7 +33,7 @@ spring:
           #        issuer-uri: ${OAUTH_ISSUER_URI:http://keycloak:8080/realms/shop}
           #        jwk-set-uri: ${OAUTH_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
           jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/shop/protocol/openid-connect/certs}
-          issuer-uri: http://keycloak:8080/realms/shop
+#          issuer-uri: http://keycloak:8080/realms/shop
 app:
 #  securityDisabled: ${SECURITY_DISABLED:false}
   orderTopic: order.created

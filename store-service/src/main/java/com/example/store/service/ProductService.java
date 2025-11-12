@@ -14,7 +14,12 @@ public class ProductService {
   public List<Product> findAll(){ return repo.findAll(); }
 
   @Transactional
-  public Product create(Product p){ return repo.save(p); }
+  public Product create(Product p){
+    if (p.getQuantity() == null) {
+      p.setQuantity(0);
+    }
+    return repo.save(p); }
+
 
   @Transactional
   public void delete(Long id){ repo.deleteById(id); }

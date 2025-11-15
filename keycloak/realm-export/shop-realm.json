@@ -12,8 +12,14 @@
   },
   "roles": {
     "realm": [
-      { "name": "ADMIN", "description": "Administrator role" },
-      { "name": "CUSTOMER", "description": "Customer role" }
+      {
+        "name": "ADMIN",
+        "description": "Administrator role"
+      },
+      {
+        "name": "CUSTOMER",
+        "description": "Customer role"
+      }
     ]
   },
   "clients": [
@@ -29,8 +35,12 @@
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "bearerOnly": false,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"],
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
       "fullScopeAllowed": true,
       "attributes": {
         "pkce.code.challenge.method": "S256"
@@ -61,9 +71,15 @@
       "firstName": "Admin",
       "lastName": "One",
       "email": "admin1@example.com",
-      "realmRoles": ["ADMIN"],
+      "realmRoles": [
+        "ADMIN"
+      ],
       "credentials": [
-        { "type": "password", "value": "admin1", "temporary": false }
+        {
+          "type": "password",
+          "value": "admin1",
+          "temporary": false
+        }
       ]
     },
     {
@@ -73,9 +89,15 @@
       "firstName": "Customer",
       "lastName": "One",
       "email": "customer1@example.com",
-      "realmRoles": ["CUSTOMER"],
+      "realmRoles": [
+        "CUSTOMER"
+      ],
       "credentials": [
-        { "type": "password", "value": "customer1", "temporary": false }
+        {
+          "type": "password",
+          "value": "customer1",
+          "temporary": false
+        }
       ]
     }
   ]

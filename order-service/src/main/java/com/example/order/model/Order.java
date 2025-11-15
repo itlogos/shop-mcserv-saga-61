@@ -16,7 +16,7 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long customerId;
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "order_items", joinColumns = @JoinColumn(name = "order_id"))
     @AttributeOverrides({
             @AttributeOverride(name = "productId", column = @Column(name = "product_id")),

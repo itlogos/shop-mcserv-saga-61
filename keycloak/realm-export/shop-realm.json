@@ -10,6 +10,7 @@
   "attributes": {
     "frontendUrl": "http://localhost:8085"
   },
+
   "roles": {
     "realm": [
       {
@@ -22,30 +23,37 @@
       }
     ]
   },
+
   "clients": [
     {
       "clientId": "frontend",
       "name": "frontend",
       "enabled": true,
-      "publicClient": true,
       "protocol": "openid-connect",
+      "publicClient": true,
+
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
       "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "bearerOnly": false,
+      "fullScopeAllowed": true,
+
       "redirectUris": [
-        "*"
+        "http://localhost:5173/*"
       ],
       "webOrigins": [
-        "*"
+        "http://localhost:5173"
       ],
-      "fullScopeAllowed": true,
+
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "",
+        "post.logout.redirect.uris": "http://localhost:5173/*",
+        "oauth2.device.authorization.grant.enabled": "false"
       }
     },
+
     {
       "clientId": "svc-gateway",
       "name": "svc-gateway",
@@ -53,16 +61,21 @@
       "protocol": "openid-connect",
       "publicClient": false,
       "bearerOnly": false,
+
       "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": false,
+
       "redirectUris": [],
       "webOrigins": [],
-      "secret": "NhLtHQLDhUfQ8lzSKuQcSKaf5wfFZT1P"
+
+      "secret": "s3cr3t-svc-gateway"
     }
   ],
+
   "users": [
     {
       "username": "admin1",

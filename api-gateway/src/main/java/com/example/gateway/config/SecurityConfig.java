@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -27,28 +28,37 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
   @Bean
-  SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-    http
+  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+    return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            // Включаем CORS, чтобы использовался spring.cloud.gateway.globalcors из application.yml
+            .cors(Customizer.withDefaults())
             .authorizeExchange(ex -> ex
+                    // Разрешаем preflight-запросы
+                    .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .pathMatchers("/actuator/**").permitAll()
 
+                    // ADMIN-эндпоинты
                     .pathMatchers(HttpMethod.POST,   "/store/api/admin/**").hasRole("ADMIN")
                     .pathMatchers(HttpMethod.PUT,    "/store/api/admin/**").hasRole("ADMIN")
                     .pathMatchers(HttpMethod.DELETE, "/store/api/admin/**").hasRole("ADMIN")
 
+                    // Остальные API требуют аутентификации
                     .pathMatchers("/store/**", "/customer/**", "/order/**").authenticated()
                     .anyExchange().authenticated()
             )
             .oauth2ResourceServer(oauth -> oauth
                     .jwt(jwt -> jwt.jwtAuthenticationConverter(reactiveKeycloakRealmRoleConverter()))
-            );
-
-    return http.build();
+            )
+            .build();
   }
 
+  /**
+   * Конвертер ролей из Keycloak (realm_access.roles -> ROLE_xxx)
+   * Оригинальная логика из твоего проекта.
+   */
   private Converter<Jwt, Mono<AbstractAuthenticationToken>> reactiveKeycloakRealmRoleConverter() {
-    var delegate = new JwtAuthenticationConverter();
+    JwtAuthenticationConverter delegate = new JwtAuthenticationConverter();
     delegate.setJwtGrantedAuthoritiesConverter((Jwt jwt) -> {
       Map<String, Object> ra = jwt.getClaimAsMap("realm_access");
       Object roles = (ra != null) ? ra.get("roles") : null;

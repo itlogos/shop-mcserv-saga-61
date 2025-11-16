@@ -10,6 +10,25 @@ spring:
     gateway:
       default-filters:
         - TokenRelay
+
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - Authorization
+              - Content-Type
+            exposedHeaders:
+              - Authorization
+            allowCredentials: true
       routes:
         - id: store
           uri: http://store-service:8081

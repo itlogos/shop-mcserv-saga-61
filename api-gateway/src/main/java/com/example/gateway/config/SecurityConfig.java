@@ -28,23 +28,31 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
   @Bean
-  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+  public SecurityWebFilterChain springSecuritylterChain(ServerHttpSecurity http) {
     return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             // Включаем CORS, чтобы использовался spring.cloud.gateway.globalcors из application.yml
             .cors(Customizer.withDefaults())
             .authorizeExchange(ex -> ex
-                    // Разрешаем preflight-запросы
                     .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .pathMatchers("/actuator/**").permitAll()
 
-                    // ADMIN-эндпоинты
-                    .pathMatchers(HttpMethod.POST,   "/store/api/admin/**").hasRole("ADMIN")
-                    .pathMatchers(HttpMethod.PUT,    "/store/api/admin/**").hasRole("ADMIN")
-                    .pathMatchers(HttpMethod.DELETE, "/store/api/admin/**").hasRole("ADMIN")
+                    // Публично – витрина товаров
+                    .pathMatchers(HttpMethod.GET, "/store/api/products").permitAll()
 
-                    // Остальные API требуют аутентификации
-                    .pathMatchers("/store/**", "/customer/**", "/order/**").authenticated()
+                    // Админка магазина
+                    .pathMatchers("/store/api/admin/**").hasRole("ADMIN")
+
+                    // Бизнес-операции магазина (просмотр/покупка, кроме админки)
+                    .pathMatchers("/store/**").hasAnyRole("CUSTOMER", "ADMIN")
+
+                    // Клиенты
+                    .pathMatchers("/customer/**").hasAnyRole("CUSTOMER", "ADMIN")
+
+                    // Заказы
+                    .pathMatchers("/order/**").hasAnyRole("CUSTOMER", "ADMIN")
+
+                    // На всякий случай – всё остальное только для аутентифицированных
                     .anyExchange().authenticated()
             )
             .oauth2ResourceServer(oauth -> oauth
@@ -76,3 +84,6 @@ public class SecurityConfig {
     return new ReactiveJwtAuthenticationConverterAdapter(delegate);
   }
 }
+
+//
+

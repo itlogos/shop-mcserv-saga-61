@@ -27,11 +27,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/actuator/**").permitAll()
 
-                    .requestMatchers(HttpMethod.POST,   "/api/admin/**").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.PUT,    "/api/admin/**").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasRole("ADMIN")
+                    // публичный каталог
+                    .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
 
-                    .requestMatchers("/api/**").permitAll() // публичные GET, если так задумано
+                    // админские операции
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                    // всё остальное API – только аутентифицированный пользователь (CUSTOMER/ADMIN)
+                    .requestMatchers("/api/**").hasAnyRole("CUSTOMER", "ADMIN")
+
                     .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2

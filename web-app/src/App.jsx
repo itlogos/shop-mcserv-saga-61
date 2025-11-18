@@ -27,13 +27,11 @@ function base64UrlEncode(buffer) {
 }
 
 async function createPkcePair() {
-    // 32 random bytes → verifier
     const random = new Uint8Array(32)
     crypto.getRandomValues(random)
 
     const verifier = base64UrlEncode(random)
 
-    // SHA-256(verifier) → challenge
     const encoder = new TextEncoder()
     const data = encoder.encode(verifier)
     const digest = await crypto.subtle.digest('SHA-256', data)
@@ -42,23 +40,44 @@ async function createPkcePair() {
     return { verifier, challenge }
 }
 
+// ===== JWT helper (для ролей) =====
+function parseJwt(token) {
+    try {
+        const parts = token.split('.')
+        if (parts.length !== 3) return null
+        const payload = parts[1]
+            .replace(/-/g, '+')
+            .replace(/_/g, '/')
+        const json = atob(payload)
+        return JSON.parse(json)
+    } catch (e) {
+        console.error('Failed to parse JWT', e)
+        return null
+    }
+}
+
 export default function App() {
     const [token, setToken] = useState(null)
     const [authenticated, setAuthenticated] = useState(false)
     const [ready, setReady] = useState(false)
     const [tab, setTab] = useState('shop')
     const [products, setProducts] = useState([])
+    const [isAdmin, setIsAdmin] = useState(false)
 
     // ===== API =====
     async function fetchProducts(tok) {
         try {
+            const headers = {}
+            if (tok) {
+                headers.Authorization = 'Bearer ' + tok
+            }
+
             const res = await fetch(
                 (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
                 '/store/api/products',
-                {
-                    headers: { Authorization: 'Bearer ' + tok },
-                },
+                { headers },
             )
+
             if (!res.ok) {
                 console.error('Fetch products failed, status =', res.status)
                 return
@@ -97,10 +116,8 @@ export default function App() {
 
             const url = new URL(window.location.href)
 
-            // 1) достаём code из query (?code=...)
             let code = url.searchParams.get('code')
 
-            // 2) если в query нет — пробуем из hash (#code=...)
             if (!code) {
                 const rawHash = window.location.hash.startsWith('#')
                     ? window.location.hash.substring(1)
@@ -119,7 +136,6 @@ export default function App() {
                 body.set('code', code)
                 body.set('redirect_uri', window.location.origin + '/')
 
-                // PKCE: добавляем code_verifier, если есть
                 const verifier = window.sessionStorage.getItem('pkce_verifier')
                 if (verifier) {
                     body.set('code_verifier', verifier)
@@ -138,6 +154,7 @@ export default function App() {
                         console.error('Token endpoint error, status =', res.status)
                         setAuthenticated(false)
                         setToken(null)
+                        setIsAdmin(false)
                     } else {
                         const data = await res.json()
                         console.log('TOKEN RESPONSE', data)
@@ -146,17 +163,25 @@ export default function App() {
                         if (accessToken) {
                             setToken(accessToken)
                             setAuthenticated(true)
+
+                            // разбираем роли из токена
+                            const payload = parseJwt(accessToken)
+                            const roles = payload?.realm_access?.roles || []
+                            const admin = roles.includes('ADMIN') || roles.includes('ROLE_ADMIN')
+                            setIsAdmin(admin)
+
                             await fetchProducts(accessToken)
                         } else {
                             setAuthenticated(false)
+                            setIsAdmin(false)
                         }
                     }
                 } catch (e) {
                     console.error('Token request failed:', e)
                     setAuthenticated(false)
                     setToken(null)
+                    setIsAdmin(false)
                 } finally {
-                    // чистим PKCE-данные и URL от code/state
                     window.sessionStorage.removeItem('pkce_verifier')
                     window.sessionStorage.removeItem('oauth_state')
 
@@ -171,9 +196,14 @@ export default function App() {
                 return
             }
 
-            // если code нигде нет — пользователь ещё не логинился
+            // без code — гость
             setAuthenticated(false)
             setToken(null)
+            setIsAdmin(false)
+
+            // если backend разрешает анонимный GET /store/api/products – подтянет товары
+            await fetchProducts(null)
+
             setReady(true)
         }
 
@@ -186,10 +216,8 @@ export default function App() {
         const state = crypto.randomUUID()
         const redirectUri = encodeURIComponent(window.location.origin + '/')
 
-        // генерируем PKCE-пару
         const { verifier, challenge } = await createPkcePair()
 
-        // сохраняем в sessionStorage
         window.sessionStorage.setItem('pkce_verifier', verifier)
         window.sessionStorage.setItem('oauth_state', state)
 
@@ -226,6 +254,9 @@ export default function App() {
         )
     }
 
+    const hasProducts = products && products.length > 0
+    const columnsCount = authenticated ? 5 : 4
+
     return (
         <div style={{ fontFamily: 'sans-serif', maxWidth: 900, margin: '30px auto' }}>
             <h1>Shop</h1>
@@ -239,8 +270,10 @@ export default function App() {
 
                 <button onClick={() => setTab('shop')}>Shop</button>
 
-                {/* Админ-вкладку пока показываем вручную, роли можно прикрутить позже через декодирование JWT */}
-                <button onClick={() => setTab('admin')}>Admin</button>
+                {/* Admin виден только если есть роль ADMIN */}
+                {isAdmin && (
+                    <button onClick={() => setTab('admin')}>Admin</button>
+                )}
             </div>
 
             {!authenticated && (
@@ -260,32 +293,41 @@ export default function App() {
                             <th>Name</th>
                             <th>Price</th>
                             <th>Qty</th>
-                            <th></th>
+                            {/* колонка для кнопки — только для залогиненных */}
+                            {authenticated && <th></th>}
                         </tr>
                         </thead>
                         <tbody>
-                        {products.map((p) => (
-                            <tr key={p.id}>
-                                <td>{p.id}</td>
-                                <td>{p.name}</td>
-                                <td>{p.price}</td>
-                                <td>{p.quantity}</td>
-                                <td>
-                                    <button
-                                        onClick={() => orderOne(p.id)}
-                                        disabled={!authenticated || !token || p.quantity < 1}
-                                    >
-                                        Order 1
-                                    </button>
-                                </td>
+                        {hasProducts ? (
+                            products.map((p) => (
+                                <tr key={p.id}>
+                                    <td>{p.id}</td>
+                                    <td>{p.name}</td>
+                                    <td>{p.price}</td>
+                                    <td>{p.quantity}</td>
+                                    {authenticated && (
+                                        <td>
+                                            <button
+                                                onClick={() => orderOne(p.id)}
+                                                disabled={!token || p.quantity < 1}
+                                            >
+                                                Order 1
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={columnsCount}>No products available</td>
                             </tr>
-                        ))}
+                        )}
                         </tbody>
                     </table>
                 </>
             )}
 
-            {tab === 'admin' && authenticated && (
+            {tab === 'admin' && authenticated && isAdmin && (
                 <Admin token={token} />
             )}
         </div>

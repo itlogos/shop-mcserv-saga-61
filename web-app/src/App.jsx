@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, {useEffect, useState, useMemo} from 'react'
 import Admin from './Admin.jsx'
 
 // === Keycloak config ===
@@ -37,7 +37,7 @@ async function createPkcePair() {
     const digest = await crypto.subtle.digest('SHA-256', data)
     const challenge = base64UrlEncode(digest)
 
-    return { verifier, challenge }
+    return {verifier, challenge}
 }
 
 // ===== JWT helper (для ролей) =====
@@ -62,6 +62,8 @@ export default function App() {
     const [ready, setReady] = useState(false)
     const [tab, setTab] = useState('shop')
     const [products, setProducts] = useState([])
+    const [orders, setOrders] = useState([])           // NEW
+    const [message, setMessage] = useState(null)       // { type: 'success' | 'error', text: string }
     const [isAdmin, setIsAdmin] = useState(false)
 
     // ===== API =====
@@ -75,7 +77,7 @@ export default function App() {
             const res = await fetch(
                 (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
                 '/store/api/products',
-                { headers },
+                {headers},
             )
 
             if (!res.ok) {
@@ -89,25 +91,134 @@ export default function App() {
         }
     }
 
+    async function fetchOrders(tok) {
+        try {
+            if (!tok) {
+                setOrders([])
+                return
+            }
+
+            const res = await fetch(
+                (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
+                '/order/api/orders?customerId=1',
+                {
+                    headers: {
+                        Authorization: 'Bearer ' + tok,
+                    },
+                },
+            )
+
+            if (!res.ok) {
+                console.error('Fetch orders failed, status =', res.status)
+                return
+            }
+
+            const data = await res.json()
+            setOrders(Array.isArray(data) ? data : [])
+        } catch (e) {
+            console.error('Fetch orders error', e)
+        }
+    }
+
+
     async function orderOne(id) {
         if (!token) return
-        await fetch(
-            (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
-            `/order/api/orders`,
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + token,
-                    'Content-Type': 'application/json',
+
+        try {
+            const res = await fetch(
+                (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
+                `/order/api/orders`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customerId: 1,
+                        items: [{productId: id, quantity: 1, price: 0}],
+                    }),
                 },
-                body: JSON.stringify({
-                    customerId: 1,
-                    items: [{ productId: id, quantity: 1, price: 0 }],
-                }),
-            },
-        )
-        alert('Order created; will confirm asynchronously')
+            )
+
+            if (!res.ok) {
+                setMessage({type: 'error', text: 'Failed to create order'})
+                return
+            }
+
+            const created = await res.json()
+
+            // обновляем список заказов: добавим/заменим заказ
+            setOrders((prev) => {
+                const existing = prev.find((o) => o.id === created.id)
+                if (existing) {
+                    return prev.map((o) => (o.id === created.id ? created : o))
+                }
+                return [...prev, created]
+            })
+
+            // оптимистично уменьшаем количество на складе
+            setProducts((prev) =>
+                prev.map((p) =>
+                    p.id === id
+                        ? {...p, quantity: (p.quantity ?? 0) - 1}
+                        : p,
+                ),
+            )
+
+            setMessage({type: 'success', text: 'Order created successfully'})
+        } catch (e) {
+            console.error('Order error', e)
+            setMessage({type: 'error', text: 'Unexpected error while creating order'})
+        }
     }
+
+    async function returnOne(orderId, productId) {
+        if (!token) return
+
+        try {
+            const res = await fetch(
+                (import.meta.env.VITE_API_BASE || 'http://localhost:8080') +
+                `/order/api/orders/${orderId}/items/${productId}/return-one`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                    },
+                },
+            )
+
+            if (!res.ok) {
+                setMessage({type: 'error', text: 'Failed to return item'})
+                return
+            }
+
+            const updatedOrder = await res.json()
+
+            setOrders((prev) => {
+                const replaced = prev.map((o) =>
+                    o.id === updatedOrder.id ? updatedOrder : o,
+                )
+                // удаляем заказы без позиций, если такое возможно
+                return replaced.filter((o) => o.items && o.items.length > 0)
+            })
+
+            // при возврате можно сразу добавить 1 на склад
+            setProducts((prev) =>
+                prev.map((p) =>
+                    p.id === productId
+                        ? {...p, quantity: (p.quantity ?? 0) + 1}
+                        : p,
+                ),
+            )
+
+            setMessage({type: 'success', text: 'Item successfully returned'})
+        } catch (e) {
+            console.error('Return error', e)
+            setMessage({type: 'error', text: 'Unexpected error while returning item'})
+        }
+    }
+
 
     // ===== Ручная обработка возвращённого code из Keycloak =====
     useEffect(() => {
@@ -115,8 +226,25 @@ export default function App() {
             console.log('APP START URL:', window.location.href)
 
             const url = new URL(window.location.href)
-
             let code = url.searchParams.get('code')
+
+            // NEW: если нет code, но есть сохранённый токен – поднимаем сессию
+            if (!code) {
+                const savedToken = window.sessionStorage.getItem('access_token')
+                if (savedToken) {
+                    setToken(savedToken)
+                    setAuthenticated(true)
+
+                    const payload = parseJwt(savedToken)
+                    const realmRoles = payload?.realm_access?.roles || []
+                    setIsAdmin(realmRoles.includes('ADMIN'))
+
+                    await fetchProducts(savedToken)
+                    await fetchOrders(savedToken)
+                    setReady(true)
+                    return
+                }
+            }
 
             if (!code) {
                 const rawHash = window.location.hash.startsWith('#')
@@ -160,19 +288,26 @@ export default function App() {
                         console.log('TOKEN RESPONSE', data)
 
                         const accessToken = data.access_token
+
                         if (accessToken) {
+                            // 1) сохраняем токен и флаг авторизации
                             setToken(accessToken)
                             setAuthenticated(true)
+                            window.sessionStorage.setItem('access_token', accessToken)
 
-                            // разбираем роли из токена
+                            // 2) разбираем JWT и достаём роли
                             const payload = parseJwt(accessToken)
-                            const roles = payload?.realm_access?.roles || []
-                            const admin = roles.includes('ADMIN') || roles.includes('ROLE_ADMIN')
-                            setIsAdmin(admin)
+                            const realmRoles =
+                                payload?.realm_access?.roles || []
 
+                            setIsAdmin(realmRoles.includes('ADMIN'))
+
+                            // 3) подгружаем данные для авторизованного пользователя
                             await fetchProducts(accessToken)
+                            await fetchOrders(accessToken)
                         } else {
                             setAuthenticated(false)
+                            setToken(null)
                             setIsAdmin(false)
                         }
                     }
@@ -193,16 +328,18 @@ export default function App() {
                     setReady(true)
                 }
 
+                // ВАЖНО: не переходить в гостевой код после успешной обработки code
                 return
             }
 
-            // без code — гость
+            // ===== Без code и без сохранённого токена — гость =====
             setAuthenticated(false)
             setToken(null)
             setIsAdmin(false)
 
             // если backend разрешает анонимный GET /store/api/products – подтянет товары
             await fetchProducts(null)
+            setOrders([]) // нет авторизации – нет заказов
 
             setReady(true)
         }
@@ -210,13 +347,75 @@ export default function App() {
         doAuthFlow()
     }, [])
 
+
+    // агрегированное представление "My orders" по продукту
+    const aggregatedOrders = React.useMemo(() => {
+        if (!orders || orders.length === 0) return []
+
+        const rows = []
+
+        for (const o of orders) {
+            for (const item of o.items || []) {
+                const productId = item.productId
+                if (productId == null) continue
+
+                let row = rows.find((r) => r.productId === productId)
+                if (!row) {
+                    const product = (products || []).find((p) => p.id === productId)
+                    row = {
+                        productId,
+                        productName: product ? product.name : `Product ${productId}`,
+                        quantity: 0,
+                        // будем хранить список заказов, где встретился продукт
+                        orderIds: [],
+                        // "агрегированный" статус – пока пусть будет статус последнего заказа
+                        status: o.status || 'CREATED',
+                    }
+                    rows.push(row)
+                }
+
+                row.quantity += item.quantity ?? 0
+                row.orderIds.push(o.id)
+                // при желании можно усложнить логику:
+                // например, если хоть один FAILED — показывать FAILED и т.п.
+                row.status = o.status || row.status
+            }
+        }
+
+        return rows
+    }, [orders, products])
+
+    async function returnAggregatedOne(productId) {
+        if (!token) return
+
+        // ищем любой Order, где есть этот productId с qty > 0
+        const entry = orders
+            .flatMap((o) =>
+                (o.items || []).map((item) => ({
+                    order: o,
+                    item,
+                })),
+            )
+            .find(
+                (e) =>
+                    e.item.productId === productId &&
+                    (e.item.quantity ?? 0) > 0,
+            )
+
+        if (!entry) {
+            return
+        }
+
+        await returnOne(entry.order.id, productId)
+    }
+
     // ===== Login / Logout =====
 
     const doLogin = async () => {
         const state = crypto.randomUUID()
         const redirectUri = encodeURIComponent(window.location.origin + '/')
 
-        const { verifier, challenge } = await createPkcePair()
+        const {verifier, challenge} = await createPkcePair()
 
         window.sessionStorage.setItem('pkce_verifier', verifier)
         window.sessionStorage.setItem('oauth_state', state)
@@ -234,6 +433,11 @@ export default function App() {
     }
 
     const doLogout = () => {
+        // чистим сохранённые данные сессии
+        window.sessionStorage.removeItem('access_token')
+        window.sessionStorage.removeItem('pkce_verifier')
+        window.sessionStorage.removeItem('oauth_state')
+
         const redirectUri = encodeURIComponent(window.location.origin + '/')
         const url =
             `${LOGOUT_URL}?client_id=${encodeURIComponent(
@@ -247,7 +451,7 @@ export default function App() {
 
     if (!ready) {
         return (
-            <div style={{ fontFamily: 'sans-serif', maxWidth: 900, margin: '30px auto' }}>
+            <div style={{fontFamily: 'sans-serif', maxWidth: 900, margin: '30px auto'}}>
                 <h1>Shop</h1>
                 <p>Waiting for authentication...</p>
             </div>
@@ -258,10 +462,30 @@ export default function App() {
     const columnsCount = authenticated ? 5 : 4
 
     return (
-        <div style={{ fontFamily: 'sans-serif', maxWidth: 900, margin: '30px auto' }}>
+        <div style={{fontFamily: 'sans-serif', maxWidth: 900, margin: '30px auto'}}>
             <h1>Shop</h1>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            {message && (
+                <div
+                    style={{
+                        marginBottom: 12,
+                        padding: '8px 12px',
+                        borderRadius: 4,
+                        border: '0px solid',
+                        borderColor:
+                            message.type === 'error' ? '#f5a3a3' : '#8dd7a5',
+                        backgroundColor:
+                            message.type === 'error' ? '#ffe6e6' : '#e6ffed',
+                        color: '#333',
+                        fontSize: 14,
+                    }}
+                >
+                    {message.text}
+                </div>
+            )}
+
+
+            <div style={{display: 'flex', gap: 8, marginBottom: 10}}>
                 {authenticated && (
                     <button onClick={doLogout}>
                         Logout
@@ -277,7 +501,7 @@ export default function App() {
             </div>
 
             {!authenticated && (
-                <div style={{ marginBottom: 10 }}>
+                <div style={{marginBottom: 10}}>
                     <b>You are not logged in.</b>{' '}
                     <button onClick={doLogin}>Login</button>
                 </div>
@@ -293,8 +517,7 @@ export default function App() {
                             <th>Name</th>
                             <th>Price</th>
                             <th>Qty</th>
-                            {/* колонка для кнопки — только для залогиненных */}
-                            {authenticated && <th></th>}
+                            {authenticated && <th>Action</th>}
                         </tr>
                         </thead>
                         <tbody>
@@ -324,11 +547,66 @@ export default function App() {
                         )}
                         </tbody>
                     </table>
+
+                    {authenticated && (
+                        <>
+                            <h2 style={{marginTop: 24}}>My orders</h2>
+                            <table
+                                border="0"
+                                cellPadding="6"
+                                style={{
+                                    width: '80%',
+                                    tableLayout: 'fixed',
+                                }}
+                            >
+                                <thead>
+                                <tr>
+                                    <th style={{width: '50%'}}>Product</th>
+                                    <th style={{width: '20%'}}>Status</th>
+                                    <th style={{width: '15%'}}>Qty</th>
+                                    <th style={{width: '15%'}}>Actions</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {aggregatedOrders.length > 0 ? (
+                                    aggregatedOrders.map((row) => (
+                                        <tr key={row.productId}>
+                                            <td
+                                                style={{
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {row.productName}
+                                            </td>
+                                            <td>{row.status}</td>
+                                            <td>{row.quantity}</td>
+                                            <td>
+                                                <button
+                                                    onClick={() => returnAggregatedOne(row.productId)}
+                                                    disabled={!token || row.quantity < 1}
+                                                >
+                                                    Return 1
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4}>No orders yet</td>
+                                    </tr>
+                                )}
+                                </tbody>
+                            </table>
+
+                        </>
+                    )}
                 </>
             )}
 
             {tab === 'admin' && authenticated && isAdmin && (
-                <Admin token={token} />
+                <Admin token={token}/>
             )}
         </div>
     )

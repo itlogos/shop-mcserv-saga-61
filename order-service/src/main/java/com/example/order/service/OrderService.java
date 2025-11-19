@@ -8,14 +8,17 @@ import com.example.order.repo.OutboxRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import java.math.BigDecimal;
 
 @Service
 public class OrderService {
+
     private final OrderRepository repo;
     private final KafkaTemplate<String, String> kafka;
     private final WebClient storeClient;
@@ -28,13 +31,28 @@ public class OrderService {
         this.repo = repo;
         this.kafka = kafka;
         this.outbox = outbox;
+
+        // WebClient с автоматическим прокидыванием Bearer-токена
         this.storeClient = WebClient.builder()
-                .baseUrl(storeUrl) // напр. http://store-service:8081
+                .baseUrl(storeUrl) // http://store-service:8081
+                .filter((request, next) -> {
+                    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+                    if (auth instanceof JwtAuthenticationToken jwtAuth) {
+                        String tokenValue = jwtAuth.getToken().getTokenValue();
+
+                        ClientRequest newRequest = ClientRequest.from(request)
+                                .headers(headers -> headers.setBearerAuth(tokenValue))
+                                .build();
+
+                        return next.exchange(newRequest);
+                    }
+
+                    // если по какой-то причине аутентификации нет — идём без заголовка
+                    return next.exchange(request);
+                })
                 .build();
     }
-
-    // DTO ответа store-service: /api/products/{id}
-    public record ProductDto(Long id, String name, BigDecimal price, Integer quantity) {}
 
     @Transactional
     public Order create(Order order) {
@@ -53,13 +71,13 @@ public class OrderService {
 
             // фиксируем цену на момент оформления
             item.setPrice(product.price().doubleValue());
-            // ВАЖНО: НЕТ item.setOrder(order) — у тебя Embeddable + ElementCollection
+            // Embeddable + @ElementCollection – setOrder(order) не нужен
         }
 
         // 2) Статус
         order.setStatus("CREATED");
 
-        // 3) Сохраняем заказ (Hibernate сам вставит строки в order_items через @ElementCollection)
+        // 3) Сохраняем заказ
         Order saved = repo.save(order);
 
         // 4) Outbox событие
@@ -79,5 +97,41 @@ public class OrderService {
                 .build());
 
         return saved;
+    }
+
+    @Transactional
+    public Order returnOne(Long orderId, Long productId) {
+        Order order = repo.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Order %d not found".formatted(orderId)));
+
+        boolean updated = false;
+
+        var iterator = order.getItems().iterator();
+        while (iterator.hasNext()) {
+            OrderItem item = iterator.next();
+            if (productId.equals(item.getProductId())) {
+                if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                    throw new IllegalStateException(
+                            "Nothing to return for product %d in order %d".formatted(productId, orderId));
+                }
+                int newQty = item.getQuantity() - 1;
+                item.setQuantity(newQty);
+                if (newQty == 0) {
+                    iterator.remove(); // позиция исчезает из заказа
+                }
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            throw new EntityNotFoundException(
+                    "Order %d has no item with product %d".formatted(orderId, productId));
+        }
+
+        // Здесь можно добавить outbox-событие "OrderReturned" при необходимости
+
+        return repo.save(order);
     }
 }

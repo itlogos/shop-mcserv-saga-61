@@ -507,29 +507,148 @@ export default function App() {
                 </div>
             )}
 
+            {/*{tab === 'shop' && (*/}
+            {/*    <>*/}
+            {/*        <h2>Products</h2>*/}
+            {/*        <table border="1" cellPadding="6">*/}
+            {/*            <thead>*/}
+            {/*            <tr>*/}
+            {/*                <th>ID</th>*/}
+            {/*                <th>Name</th>*/}
+            {/*                <th>Price</th>*/}
+            {/*                <th>Qty</th>*/}
+            {/*                {authenticated && <th>Action</th>}*/}
+            {/*            </tr>*/}
+            {/*            </thead>*/}
+            {/*            <tbody>*/}
+            {/*            {hasProducts ? (*/}
+            {/*                products.map((p) => (*/}
+            {/*                    <tr key={p.id}>*/}
+            {/*                        <td>{p.id}</td>*/}
+            {/*                        <td>{p.name}</td>*/}
+            {/*                        <td>{p.price}</td>*/}
+            {/*                        <td>{p.quantity}</td>*/}
+            {/*                        {authenticated && (*/}
+            {/*                            <td>*/}
+            {/*                                <button*/}
+            {/*                                    onClick={() => orderOne(p.id)}*/}
+            {/*                                    disabled={!token || p.quantity < 1}*/}
+            {/*                                >*/}
+            {/*                                    Order 1*/}
+            {/*                                </button>*/}
+            {/*                            </td>*/}
+            {/*                        )}*/}
+            {/*                    </tr>*/}
+            {/*                ))*/}
+            {/*            ) : (*/}
+            {/*                <tr>*/}
+            {/*                    <td colSpan={columnsCount}>No products available</td>*/}
+            {/*                </tr>*/}
+            {/*            )}*/}
+            {/*            </tbody>*/}
+            {/*        </table>*/}
+
+            {/*        {authenticated && (*/}
+            {/*            <>*/}
+            {/*                <h2 style={{marginTop: 24}}>My orders</h2>*/}
+            {/*                <table*/}
+            {/*                    border="0"*/}
+            {/*                    cellPadding="6"*/}
+            {/*                    style={{*/}
+            {/*                        width: '80%',*/}
+            {/*                        tableLayout: 'fixed',*/}
+            {/*                    }}*/}
+            {/*                >*/}
+            {/*                    <thead>*/}
+            {/*                    <tr>*/}
+            {/*                        <th style={{width: '50%'}}>Product</th>*/}
+            {/*                        <th style={{width: '20%'}}>Status</th>*/}
+            {/*                        <th style={{width: '15%'}}>Qty</th>*/}
+            {/*                        <th style={{width: '15%'}}>Actions</th>*/}
+            {/*                    </tr>*/}
+            {/*                    </thead>*/}
+            {/*                    <tbody>*/}
+            {/*                    {aggregatedOrders.length > 0 ? (*/}
+            {/*                        aggregatedOrders.map((row) => (*/}
+            {/*                            <tr key={row.productId}>*/}
+            {/*                                <td*/}
+            {/*                                    style={{*/}
+            {/*                                        overflow: 'hidden',*/}
+            {/*                                        textOverflow: 'ellipsis',*/}
+            {/*                                        whiteSpace: 'nowrap',*/}
+            {/*                                    }}*/}
+            {/*                                >*/}
+            {/*                                    {row.productName}*/}
+            {/*                                </td>*/}
+            {/*                                <td>{row.status}</td>*/}
+            {/*                                <td>{row.quantity}</td>*/}
+            {/*                                <td>*/}
+            {/*                                    <button*/}
+            {/*                                        onClick={() => returnAggregatedOne(row.productId)}*/}
+            {/*                                        disabled={!token || row.quantity < 1}*/}
+            {/*                                    >*/}
+            {/*                                        Return 1*/}
+            {/*                                    </button>*/}
+            {/*                                </td>*/}
+            {/*                            </tr>*/}
+            {/*                        ))*/}
+            {/*                    ) : (*/}
+            {/*                        <tr>*/}
+            {/*                            <td colSpan={4}>No orders yet</td>*/}
+            {/*                        </tr>*/}
+            {/*                    )}*/}
+            {/*                    </tbody>*/}
+            {/*                </table>*/}
+
+            {/*            </>*/}
+            {/*        )}*/}
+            {/*    </>*/}
+            {/*)}*/}
+
+            {/*{tab === 'admin' && authenticated && isAdmin && (*/}
+            {/*    <Admin token={token}/>*/}
+            {/*)}*/}
+
             {tab === 'shop' && (
                 <>
                     <h2>Products</h2>
-                    <table border="1" cellPadding="6">
+
+                    <table
+                        border="1"
+                        cellPadding="6"
+                        style={{
+                            width: '80%',
+                            borderCollapse: 'collapse',
+                            tableLayout: 'fixed'
+                        }}
+                    >
                         <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Price</th>
-                            <th>Qty</th>
-                            {authenticated && <th>Action</th>}
+                            <th style={{width: '10%'}}>ID</th>
+                            <th style={{width: '45%'}}>Name</th>
+                            <th style={{width: '15%', textAlign: 'center'}}>Price</th>
+                            <th style={{width: '15%', textAlign: 'center'}}>Qty</th>
+                            {authenticated && (
+                                <th style={{width: '15%', textAlign: 'center', whiteSpace: 'nowrap'}}>Action</th>
+                            )}
                         </tr>
                         </thead>
+
                         <tbody>
                         {hasProducts ? (
                             products.map((p) => (
                                 <tr key={p.id}>
                                     <td>{p.id}</td>
                                     <td>{p.name}</td>
-                                    <td>{p.price}</td>
-                                    <td>{p.quantity}</td>
+                                    <td style={{textAlign: 'center'}}>{p.price}</td>
+                                    <td style={{textAlign: 'center'}}>{p.quantity}</td>
                                     {authenticated && (
-                                        <td>
+                                        <td
+                                            style={{
+                                                textAlign: 'center',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
                                             <button
                                                 onClick={() => orderOne(p.id)}
                                                 disabled={!token || p.quantity < 1}
@@ -551,22 +670,25 @@ export default function App() {
                     {authenticated && (
                         <>
                             <h2 style={{marginTop: 24}}>My orders</h2>
+
                             <table
-                                border="0"
+                                border="1"
                                 cellPadding="6"
                                 style={{
                                     width: '80%',
-                                    tableLayout: 'fixed',
+                                    borderCollapse: 'collapse',
+                                    tableLayout: 'fixed'
                                 }}
                             >
                                 <thead>
                                 <tr>
                                     <th style={{width: '50%'}}>Product</th>
-                                    <th style={{width: '20%'}}>Status</th>
-                                    <th style={{width: '15%'}}>Qty</th>
-                                    <th style={{width: '15%'}}>Actions</th>
+                                    <th style={{width: '20%', textAlign: 'center'}}>Status</th>
+                                    <th style={{width: '15%', textAlign: 'center'}}>Qty</th>
+                                    <th style={{width: '15%', textAlign: 'center', whiteSpace: 'nowrap'}}>Actions</th>
                                 </tr>
                                 </thead>
+
                                 <tbody>
                                 {aggregatedOrders.length > 0 ? (
                                     aggregatedOrders.map((row) => (
@@ -575,14 +697,22 @@ export default function App() {
                                                 style={{
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
+                                                    whiteSpace: 'nowrap'
                                                 }}
                                             >
                                                 {row.productName}
                                             </td>
-                                            <td>{row.status}</td>
-                                            <td>{row.quantity}</td>
-                                            <td>
+
+                                            <td style={{textAlign: 'center'}}>{row.status}</td>
+
+                                            <td style={{textAlign: 'center'}}>{row.quantity}</td>
+
+                                            <td
+                                                style={{
+                                                    textAlign: 'center',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
                                                 <button
                                                     onClick={() => returnAggregatedOne(row.productId)}
                                                     disabled={!token || row.quantity < 1}
@@ -599,7 +729,6 @@ export default function App() {
                                 )}
                                 </tbody>
                             </table>
-
                         </>
                     )}
                 </>
